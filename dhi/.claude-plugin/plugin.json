@@ -1,7 +1,7 @@
 {
   "name": "dhi",
-  "version": "0.1.0",
-  "description": "Personal document Q&A over a local folder of PDFs, DOCX, PPTX, XLSX, TXT, MD, CSV, and RTF files organized into topic subfolders. Semantically indexes documents -- including embedded images via vision -- into a local SQLite index (no cloud embedding service, no paid API) and answers questions strictly from that content, always citing document + page/section + topic, saying \"I don't know\" when the documents don't cover it.",
+  "version": "0.2.0",
+  "description": "Personal document Q&A over a Google Drive folder of PDFs, DOCX, PPTX, XLSX, TXT, MD, CSV, and RTF files organized into topic subfolders. Pulls documents live via the Drive connector and indexes them -- including embedded images via vision -- into a local SQLite index, without ever copying the source documents to local disk, and answers questions strictly from that content, always citing document + page/section + topic, saying \"I don't know\" when the documents don't cover it.",
   "author": {
     "name": "rugupta2024",
     "email": "rugupta2024@gmail.com"

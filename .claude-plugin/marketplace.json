@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "dhi",
-      "description": "Personal document Q&A: semantically indexes your PDFs/DOCX/PPTX/XLSX/TXT/MD/CSV/RTF files (including embedded images) organized into topic folders, and answers questions strictly from that content with citations, saying \"I don't know\" when it's not covered.",
+      "description": "Personal document Q&A: indexes PDFs/DOCX/PPTX/XLSX/TXT/MD/CSV/RTF files (including embedded images) from a Google Drive folder organized into topics -- pulled live via the Drive connector, never copied to local disk -- and answers questions strictly from that content with citations, saying \"I don't know\" when it's not covered.",
       "source": "./dhi",
       "author": {
         "name": "rugupta2024"

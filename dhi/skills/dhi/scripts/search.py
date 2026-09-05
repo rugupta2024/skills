@@ -13,26 +13,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import db as db_module  # noqa: E402
 from config import load_config  # noqa: E402
 from embedding import embed_query  # noqa: E402
-from manifest import resolve_root  # noqa: E402
+from paths import DB_PATH  # noqa: E402
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root")
     ap.add_argument("--query", required=True)
     ap.add_argument("--top-k", type=int, default=8)
     ap.add_argument("--threshold", type=float, default=None)
     args = ap.parse_args()
-    root = resolve_root(args.root)
 
-    config = load_config(root)
+    config = load_config()
     threshold = args.threshold if args.threshold is not None else config["similarity_threshold"]
 
-    conn = db_module.connect(root / ".dhi" / "index.sqlite3")
+    conn = db_module.connect(DB_PATH)
     rows = conn.execute(
         """
         SELECT c.text, c.page_number, c.section_label, c.chunk_type,
-               d.rel_path, d.topic, e.vector
+               d.title, d.topic, e.vector
         FROM chunks c
         JOIN documents d ON d.doc_id = c.doc_id
         JOIN embeddings e ON e.chunk_id = c.chunk_id
@@ -57,7 +55,7 @@ def main():
     results = [
         {
             "score": float(score),
-            "doc_rel_path": row[4],
+            "document": row[4],
             "topic": row[5],
             "page_number": row[1],
             "section_label": row[2],

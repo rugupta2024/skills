@@ -1,4 +1,9 @@
-"""Per-file-type text + embedded-image extraction.
+"""Per-file-type text + embedded-image extraction, operating entirely on
+in-memory bytes -- the source document is never written to disk. Embedded
+images are the one exception: each gets written to a transient temp
+directory just long enough for Claude's vision to caption it during
+/dhi index; the caller is responsible for deleting that directory once
+captioning finishes.
 
 Each extractor returns (units, images):
   units  -> list of {"page_number": int|None, "section_label": str|None, "text": str}
@@ -7,6 +12,7 @@ Each extractor returns (units, images):
 Every unit maps to exactly one page/section so citations are unambiguous.
 """
 
+import io
 from pathlib import Path
 
 MIN_IMAGE_DIM = 80  # skip icons/bullets/dividers, not real content
@@ -28,10 +34,10 @@ def _drop_tiny_images(images: list[dict]) -> list[dict]:
     return kept
 
 
-def extract_pdf(path: Path, image_dir: Path):
+def extract_pdf(data: bytes, image_dir: Path):
     from pypdf import PdfReader
 
-    reader = PdfReader(str(path))
+    reader = PdfReader(io.BytesIO(data))
     units, images = [], []
     for i, page in enumerate(reader.pages, start=1):
         text = (page.extract_text() or "").strip()
@@ -39,16 +45,17 @@ def extract_pdf(path: Path, image_dir: Path):
             units.append({"page_number": i, "section_label": None, "text": text})
         for j, img in enumerate(page.images):
             ext = Path(img.name).suffix or ".png"
+            image_dir.mkdir(parents=True, exist_ok=True)
             img_path = image_dir / f"p{i}_{j}{ext}"
             img_path.write_bytes(img.data)
             images.append({"page_number": i, "section_label": None, "image_path": img_path})
     return units, images
 
 
-def extract_docx(path: Path, image_dir: Path):
+def extract_docx(data: bytes, image_dir: Path):
     import docx
 
-    document = docx.Document(str(path))
+    document = docx.Document(io.BytesIO(data))
     units = []
     current_section = None
     buffer: list[str] = []
@@ -71,17 +78,18 @@ def extract_docx(path: Path, image_dir: Path):
     for i, rel in enumerate(document.part.rels.values()):
         if "image" in rel.reltype:
             ext = Path(rel.target_ref).suffix or ".png"
+            image_dir.mkdir(parents=True, exist_ok=True)
             img_path = image_dir / f"img{i}{ext}"
             img_path.write_bytes(rel.target_part.blob)
             images.append({"page_number": None, "section_label": None, "image_path": img_path})
     return units, images
 
 
-def extract_pptx(path: Path, image_dir: Path):
+def extract_pptx(data: bytes, image_dir: Path):
     from pptx import Presentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-    prs = Presentation(str(path))
+    prs = Presentation(io.BytesIO(data))
     units, images = [], []
     for i, slide in enumerate(prs.slides, start=1):
         title = None
@@ -96,6 +104,7 @@ def extract_pptx(path: Path, image_dir: Path):
             if shape.has_text_frame and shape.text_frame.text.strip():
                 texts.append(shape.text_frame.text)
             if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                image_dir.mkdir(parents=True, exist_ok=True)
                 img_path = image_dir / f"s{i}_{shape.shape_id}.png"
                 img_path.write_bytes(shape.image.blob)
                 images.append({"page_number": i, "section_label": title, "image_path": img_path})
@@ -104,12 +113,12 @@ def extract_pptx(path: Path, image_dir: Path):
     return units, images
 
 
-def extract_xlsx(path: Path, image_dir: Path):
+def extract_xlsx(data: bytes, image_dir: Path):
     # Embedded chart/image extraction from xlsx is skipped in v1 (openpyxl's
     # image access is unofficial API); sheet text is fully covered.
     import openpyxl
 
-    wb = openpyxl.load_workbook(str(path), data_only=True)
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     units = []
     for sheet in wb.worksheets:
         rows = [r for r in sheet.iter_rows(values_only=True) if any(c is not None for c in r)]
@@ -125,11 +134,13 @@ def extract_xlsx(path: Path, image_dir: Path):
     return units, []
 
 
-def extract_text_file(path: Path, image_dir: Path):
-    text = path.read_text(errors="ignore")
-    if path.suffix.lower() != ".md":
-        return [{"page_number": None, "section_label": None, "text": text}], []
+def extract_text_file(data: bytes, image_dir: Path):
+    text = data.decode("utf-8", errors="ignore")
+    return [{"page_number": None, "section_label": None, "text": text}], []
 
+
+def extract_md(data: bytes, image_dir: Path):
+    text = data.decode("utf-8", errors="ignore")
     units, section, buffer = [], None, []
     for line in text.splitlines():
         if line.startswith("#"):
@@ -144,11 +155,12 @@ def extract_text_file(path: Path, image_dir: Path):
     return units, []
 
 
-def extract_csv(path: Path, image_dir: Path):
+def extract_csv(data: bytes, image_dir: Path):
     import csv
+    import io as _io
 
-    with open(path, newline="", errors="ignore") as f:
-        rows = list(csv.reader(f))
+    text = data.decode("utf-8", errors="ignore")
+    rows = list(csv.reader(_io.StringIO(text)))
     if not rows:
         return [], []
 
@@ -165,29 +177,28 @@ def extract_csv(path: Path, image_dir: Path):
     return units, []
 
 
-def extract_rtf(path: Path, image_dir: Path):
+def extract_rtf(data: bytes, image_dir: Path):
     from striprtf.striprtf import rtf_to_text
 
-    text = rtf_to_text(path.read_text(errors="ignore"))
+    text = rtf_to_text(data.decode("utf-8", errors="ignore"))
     return [{"page_number": None, "section_label": None, "text": text}], []
 
 
 EXTRACTORS = {
-    ".pdf": extract_pdf,
-    ".docx": extract_docx,
-    ".pptx": extract_pptx,
-    ".xlsx": extract_xlsx,
-    ".txt": extract_text_file,
-    ".md": extract_text_file,
-    ".csv": extract_csv,
-    ".rtf": extract_rtf,
+    "pdf": extract_pdf,
+    "docx": extract_docx,
+    "pptx": extract_pptx,
+    "xlsx": extract_xlsx,
+    "txt": extract_text_file,
+    "md": extract_md,
+    "csv": extract_csv,
+    "rtf": extract_rtf,
 }
 
 
-def extract(path: Path, image_dir: Path):
-    fn = EXTRACTORS.get(path.suffix.lower())
+def extract_bytes(ext: str, data: bytes, image_dir: Path):
+    fn = EXTRACTORS.get(ext.lower().lstrip("."))
     if fn is None:
         return [], []
-    image_dir.mkdir(parents=True, exist_ok=True)
-    units, images = fn(path, image_dir)
+    units, images = fn(data, image_dir)
     return units, _drop_tiny_images(images)

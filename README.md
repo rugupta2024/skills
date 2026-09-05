@@ -8,7 +8,7 @@ installable plugin.
 
 | Skill | What it does |
 |---|---|
-| [`dhi`](dhi/skills/dhi/README.md) | Personal document Q&A -- organize documents into topic folders, `dhi` indexes them locally and answers questions strictly from that content, with citations. |
+| [`dhi`](dhi/skills/dhi/README.md) | Personal document Q&A -- organize documents into topic folders in Google Drive, `dhi` reads them live via the Drive connector (never copying them locally) and answers questions strictly from that content, with citations. |
 
 ## Installing a skill (for Claude Code users)
 

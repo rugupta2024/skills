@@ -6,12 +6,11 @@ from pathlib import Path
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
     doc_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id       TEXT NOT NULL UNIQUE,
     topic         TEXT NOT NULL,
-    rel_path      TEXT NOT NULL UNIQUE,
+    title         TEXT NOT NULL,
     file_type     TEXT NOT NULL,
-    content_hash  TEXT NOT NULL,
-    mtime         REAL NOT NULL,
-    file_size     INTEGER NOT NULL,
+    modified_time TEXT NOT NULL,
     last_indexed  TEXT NOT NULL
 );
 
@@ -51,6 +50,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(db_path: Path) -> None:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
     conn.executescript(SCHEMA)
     conn.commit()
