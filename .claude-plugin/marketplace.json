@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "skills",
+  "owner": {
+    "name": "rugupta2024",
+    "email": "rugupta2024@gmail.com"
+  },
+  "metadata": {
+    "description": "Personal collection of Claude Code skills."
+  },
+  "plugins": [
+    {
+      "name": "dhi",
+      "description": "Personal document Q&A: semantically indexes your PDFs/DOCX/PPTX/XLSX/TXT/MD/CSV/RTF files (including embedded images) organized into topic folders, and answers questions strictly from that content with citations, saying \"I don't know\" when it's not covered.",
+      "source": "./dhi",
+      "author": {
+        "name": "rugupta2024"
+      }
+    }
+  ]
+}
